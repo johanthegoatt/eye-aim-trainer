@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Eye Aim Trainer</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;700&family=IBM+Plex+Sans:wght@400;600&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="shell">
+      <header>
+        <p class="kicker">WebGazer Inspired</p>
+        <h1>Eye Aim Trainer</h1>
+        <p>Calibrate gaze and train precision by dwelling on moving targets. Mouse fallback is always available.</p>
+      </header>
+
+      <section class="layout">
+        <div class="arena-wrap">
+          <canvas id="arena" width="960" height="540" aria-label="aim training arena"></canvas>
+          <div id="overlay" class="overlay">
+            <h2>Ready</h2>
+            <p>Press Start Session to begin.</p>
+          </div>
+        </div>
+
+        <aside class="panel">
+          <button id="startBtn" type="button">Start Session</button>
+          <button id="stopBtn" type="button" disabled>Stop Session</button>
+          <button id="calibrateBtn" type="button">Enable Gaze Tracking</button>
+
+          <div class="stats">
+            <p>Score <strong id="score">0</strong></p>
+            <p>Hits <strong id="hits">0</strong></p>
+            <p>Misses <strong id="misses">0</strong></p>
+            <p>Accuracy <strong id="accuracy">0%</strong></p>
+            <p>Level <strong id="level">1</strong></p>
+          </div>
+
+          <p id="status" class="meta">Mode: mouse fallback</p>
+          <p class="meta">Controls: <kbd>Space</kbd> to shoot, or dwell on target.</p>
+        </aside>
+      </section>
+    </main>
+
+    <script src="https://cdn.jsdelivr.net/npm/webgazer@2.1.0/dist/webgazer.min.js"></script>
+    <script type="module" src="./app.js"></script>
+  </body>
+</html>
