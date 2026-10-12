@@ -5,8 +5,14 @@ import {
   isCursorInsideTarget,
   accuracyPercent,
 } from "./src/targetEngine.js";
+import { createPointFilter } from "./src/oneEuro.js";
 
 const SESSION_LENGTH_MS = 60_000;
+// Extra hit room in gaze mode, in arena pixels (the canvas is 960 wide).
+const GAZE_SLACK = 34;
+// Tuned in tests/oneEuro.test.js: cuts resting jitter about 4x and still
+// catches a jump across the arena within about 5 frames.
+const GAZE_FILTER = { minCutoff: 0.5, beta: 0.0007 };
 
 const elements = {
   canvas: document.getElementById("arena"),
@@ -34,7 +40,13 @@ const appState = {
     y: elements.canvas.height / 2,
   },
   dwellMs: 0,
+  gaze: null,
+  gazeFilter: createPointFilter(GAZE_FILTER),
 };
+
+function slack() {
+  return appState.useGaze ? GAZE_SLACK : 0;
+}
 
 function setStatus(text) {
   elements.status.textContent = text;
@@ -64,7 +76,7 @@ function drawArena() {
 
   context.fillStyle = "rgba(15, 163, 177, 0.25)";
   context.beginPath();
-  context.arc(engine.target.x, engine.target.y, engine.target.radius + 14, 0, Math.PI * 2);
+  context.arc(engine.target.x, engine.target.y, engine.target.radius + Math.max(14, slack()), 0, Math.PI * 2);
   context.fill();
 
   context.fillStyle = "rgba(255, 255, 255, 0.94)";
@@ -95,7 +107,7 @@ function shoot() {
     return;
   }
 
-  const didHit = isCursorInsideTarget(appState.engine, appState.cursor.x, appState.cursor.y);
+  const didHit = isCursorInsideTarget(appState.engine, appState.cursor.x, appState.cursor.y, slack());
   appState.engine = registerShot(appState.engine, { didHit });
   appState.dwellMs = 0;
 }
@@ -120,24 +132,28 @@ function startSession() {
   setStatus(appState.useGaze ? "Mode: gaze tracking" : "Mode: mouse fallback");
 }
 
-function updateGazeCursor() {
-  if (!appState.useGaze || !window.webgazer?.getCurrentPrediction) {
-    return;
+// WebGazer 2.x's getCurrentPrediction() returns a Promise, so reading .x off
+// it every frame gave undefined and the crosshair never moved. The gaze
+// listener hands over each prediction as it is made instead; it is kept
+// here and smoothed once per frame.
+function onGaze(data) {
+  if (data && Number.isFinite(data.x) && Number.isFinite(data.y)) {
+    appState.gaze = { x: data.x, y: data.y };
   }
+}
 
-  const prediction = window.webgazer.getCurrentPrediction();
-  if (!prediction) {
+function updateGazeCursor(timestamp) {
+  if (!appState.useGaze || !appState.gaze) {
     return;
   }
 
   const rect = elements.canvas.getBoundingClientRect();
-  const x = ((prediction.x - rect.left) / rect.width) * elements.canvas.width;
-  const y = ((prediction.y - rect.top) / rect.height) * elements.canvas.height;
+  const x = ((appState.gaze.x - rect.left) / rect.width) * elements.canvas.width;
+  const y = ((appState.gaze.y - rect.top) / rect.height) * elements.canvas.height;
+  const smooth = appState.gazeFilter.filter(x, y, timestamp);
 
-  if (Number.isFinite(x) && Number.isFinite(y)) {
-    appState.cursor.x = Math.max(0, Math.min(elements.canvas.width, x));
-    appState.cursor.y = Math.max(0, Math.min(elements.canvas.height, y));
-  }
+  appState.cursor.x = Math.max(0, Math.min(elements.canvas.width, smooth.x));
+  appState.cursor.y = Math.max(0, Math.min(elements.canvas.height, smooth.y));
 }
 
 function animate(timestamp) {
@@ -148,12 +164,12 @@ function animate(timestamp) {
   const dt = Math.min(timestamp - appState.lastFrameAt, 100);
   appState.lastFrameAt = timestamp;
 
-  updateGazeCursor();
+  updateGazeCursor(timestamp);
 
   if (appState.running) {
     appState.engine = stepTrainer(appState.engine, dt);
 
-    if (isCursorInsideTarget(appState.engine, appState.cursor.x, appState.cursor.y)) {
+    if (isCursorInsideTarget(appState.engine, appState.cursor.x, appState.cursor.y, slack())) {
       appState.dwellMs += dt;
       if (appState.dwellMs >= 550) {
         shoot();
@@ -182,6 +198,8 @@ async function enableGaze() {
 
   try {
     webgazer.showVideoPreview(false).showPredictionPoints(false).showFaceOverlay(false);
+    webgazer.setGazeListener(onGaze);
+    appState.gazeFilter.reset();
     await webgazer.begin();
     appState.useGaze = true;
     setStatus("Mode: gaze tracking");

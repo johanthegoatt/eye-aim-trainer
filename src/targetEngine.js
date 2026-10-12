@@ -38,10 +38,14 @@ export function spawnTarget(state, randomFn = Math.random) {
   };
 }
 
-export function isCursorInsideTarget(state, cursorX, cursorY) {
+// `slack` widens the hit circle. Webcam gaze lands within about 4 degrees of
+// where you look at best (Papoutsaki et al., IJCAI 2016), which is far wider
+// than a 30 px target, so gaze mode passes extra room here.
+export function isCursorInsideTarget(state, cursorX, cursorY, slack = 0) {
   const dx = cursorX - state.target.x;
   const dy = cursorY - state.target.y;
-  return dx * dx + dy * dy <= state.target.radius * state.target.radius;
+  const r = state.target.radius + slack;
+  return dx * dx + dy * dy <= r * r;
 }
 
 export function scoreFromReaction(reactionMs, streak) {

@@ -60,3 +60,13 @@ test("accuracyPercent is computed from attempts", () => {
   state.misses = 1;
   assert.equal(accuracyPercent(state), 75);
 });
+
+test("gaze slack widens the hit circle", () => {
+  const state = createTrainerState();
+  state.target.x = 300;
+  state.target.y = 200;
+  state.target.radius = 30;
+
+  assert.equal(isCursorInsideTarget(state, 355, 200), false);
+  assert.equal(isCursorInsideTarget(state, 355, 200, 34), true);
+});
