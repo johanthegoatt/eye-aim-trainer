@@ -5,7 +5,10 @@ Eye Aim Trainer is a gaze-driven target practice game with WebGazer tracking and
 
 ## Features
 - Live aim arena with moving targets
-- WebGazer integration for eye-gaze cursor control
+- WebGazer integration for eye-gaze cursor control, read through its gaze listener (WebGazer 2's `getCurrentPrediction()` is async)
+- Nine-dot click calibration before gaze play, as in WebGazer's own demo
+- Gaze smoothed with a 1€ filter (Casiez et al., CHI 2012), tuned in `tests/oneEuro.test.js` to cut resting jitter about 4x while still catching a jump in about 5 frames
+- Wider hit circle in gaze mode, since webcam gaze lands within about 4 degrees at best (Papoutsaki et al., IJCAI 2016)
 - Dwell-to-hit and manual shoot controls
 - Score, streak, level, and accuracy tracking
 - Session timer with end-state summary

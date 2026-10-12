@@ -202,12 +202,58 @@ async function enableGaze() {
     appState.gazeFilter.reset();
     await webgazer.begin();
     appState.useGaze = true;
-    setStatus("Mode: gaze tracking");
+    calibrate();
   } catch (error) {
     console.error(error);
     appState.useGaze = false;
     setStatus("Gaze startup failed. Mouse fallback active.");
   }
+}
+
+// WebGazer learns from clicks: each click tells it "the eyes are here now".
+// Without any, its first guesses land far off. Nine dots across the arena,
+// three clicks each while looking at the dot, follow the calibration in
+// WebGazer's own demo.
+const CLICKS_PER_DOT = 3;
+
+function calibrate() {
+  const wrap = elements.canvas.parentElement;
+  wrap.querySelector(".calibration")?.remove();
+  const layer = document.createElement("div");
+  layer.className = "calibration";
+  const help = document.createElement("p");
+  help.textContent = "Look at each dot and click it 3 times.";
+  layer.append(help);
+  let left = 9;
+  for (const y of [8, 50, 92]) {
+    for (const x of [5, 50, 95]) {
+      const dot = document.createElement("button");
+      dot.type = "button";
+      dot.className = "dot";
+      dot.style.left = `${x}%`;
+      dot.style.top = `${y}%`;
+      dot.setAttribute("aria-label", "Calibration dot");
+      let clicks = 0;
+      dot.addEventListener("click", (event) => {
+        event.stopPropagation();
+        clicks += 1;
+        dot.style.setProperty("--done", String(clicks / CLICKS_PER_DOT));
+        if (clicks === CLICKS_PER_DOT) {
+          dot.disabled = true;
+          left -= 1;
+          if (left === 0) {
+            layer.remove();
+            appState.gazeFilter.reset();
+            setStatus("Mode: gaze tracking. Calibrated. Start a session.");
+          }
+        }
+      });
+      layer.append(dot);
+    }
+  }
+  setOverlay("");
+  wrap.append(layer);
+  setStatus("Calibrating: click every dot 3 times while looking at it.");
 }
 
 function stopGaze() {
@@ -225,6 +271,10 @@ elements.stopBtn.addEventListener("click", () => stopSession("Session stopped"))
 elements.calibrateBtn.addEventListener("click", enableGaze);
 
 elements.canvas.addEventListener("mousemove", (event) => {
+  if (appState.useGaze) {
+    // The eyes steer in gaze mode; a resting mouse would fight them.
+    return;
+  }
   const rect = elements.canvas.getBoundingClientRect();
   appState.cursor.x = ((event.clientX - rect.left) / rect.width) * elements.canvas.width;
   appState.cursor.y = ((event.clientY - rect.top) / rect.height) * elements.canvas.height;
@@ -233,7 +283,9 @@ elements.canvas.addEventListener("mousemove", (event) => {
 elements.canvas.addEventListener("click", shoot);
 
 document.addEventListener("keydown", (event) => {
-  if (event.key === " ") {
+  if (event.key === " " && !event.target.closest?.("button, input, select, textarea")) {
+    // Stop the page scrolling down a screen on every shot.
+    event.preventDefault();
     shoot();
   }
 });

@@ -146,3 +146,38 @@ kbd {
     grid-template-columns: 1fr;
   }
 }
+
+.calibration {
+  position: absolute;
+  inset: 0;
+  background: rgba(13, 23, 43, 0.55);
+}
+
+.calibration p {
+  position: absolute;
+  left: 50%;
+  top: 30%;
+  transform: translateX(-50%);
+  margin: 0;
+  color: #fff;
+  font-weight: 600;
+  text-align: center;
+}
+
+.calibration .dot {
+  --done: 0;
+  position: absolute;
+  width: 26px;
+  height: 26px;
+  margin: -13px 0 0 -13px;
+  padding: 0;
+  border-radius: 50%;
+  border: 3px solid #fff;
+  background: conic-gradient(#0fa3b1 calc(var(--done) * 360deg), #ff8c6b 0);
+  cursor: pointer;
+}
+
+.calibration .dot:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
