@@ -270,17 +270,31 @@ elements.startBtn.addEventListener("click", startSession);
 elements.stopBtn.addEventListener("click", () => stopSession("Session stopped"));
 elements.calibrateBtn.addEventListener("click", enableGaze);
 
-elements.canvas.addEventListener("mousemove", (event) => {
-  if (appState.useGaze) {
-    // The eyes steer in gaze mode; a resting mouse would fight them.
-    return;
-  }
+function aimFromEvent(event) {
   const rect = elements.canvas.getBoundingClientRect();
   appState.cursor.x = ((event.clientX - rect.left) / rect.width) * elements.canvas.width;
   appState.cursor.y = ((event.clientY - rect.top) / rect.height) * elements.canvas.height;
+}
+
+// Pointer events cover mouse, pen and touch. The eyes steer in gaze mode, so
+// a resting mouse would fight them there.
+elements.canvas.addEventListener("pointermove", (event) => {
+  if (!appState.useGaze) aimFromEvent(event);
 });
 
-elements.canvas.addEventListener("click", shoot);
+elements.canvas.addEventListener("pointerdown", (event) => {
+  if (event.pointerType === "mouse") return;
+  // A finger has no hover: the tap is both the aim and the shot.
+  if (!appState.useGaze) aimFromEvent(event);
+  event.preventDefault();
+  shoot();
+});
+
+elements.canvas.addEventListener("click", (event) => {
+  // Touch taps already shot on pointerdown; this is the mouse button.
+  if (event.pointerType && event.pointerType !== "mouse") return;
+  shoot();
+});
 
 document.addEventListener("keydown", (event) => {
   if (event.key === " " && !event.target.closest?.("button, input, select, textarea")) {
