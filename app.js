@@ -8,6 +8,7 @@ import {
 import { createPointFilter } from "./src/oneEuro.js";
 
 const SESSION_LENGTH_MS = 60_000;
+const DWELL_MS = 550;
 // Extra hit room in gaze mode, in arena pixels (the canvas is 960 wide).
 const GAZE_SLACK = 34;
 // Tuned in tests/oneEuro.test.js: cuts resting jitter about 4x and still
@@ -83,6 +84,26 @@ function drawArena() {
   context.beginPath();
   context.arc(engine.target.x, engine.target.y, engine.target.radius, 0, Math.PI * 2);
   context.fill();
+
+  if (appState.running) {
+    // Outer ring drains as the target's time runs out.
+    const life = 1 - Math.min(1, engine.target.ageMs / engine.targetLifetimeMs);
+    context.strokeStyle = life > 0.3 ? "rgba(15, 163, 177, 0.9)" : "rgba(255, 108, 108, 0.95)";
+    context.lineWidth = 4;
+    context.beginPath();
+    context.arc(engine.target.x, engine.target.y, engine.target.radius + 8, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * life);
+    context.stroke();
+
+    // Inner ring fills while you hold on target, so dwell is something you
+    // can see coming rather than a shot out of nowhere.
+    if (appState.dwellMs > 0) {
+      context.strokeStyle = "#ff8c6b";
+      context.lineWidth = 5;
+      context.beginPath();
+      context.arc(engine.target.x, engine.target.y, engine.target.radius - 6, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * Math.min(1, appState.dwellMs / DWELL_MS));
+      context.stroke();
+    }
+  }
 
   context.strokeStyle = "#ff8c6b";
   context.lineWidth = 2;
@@ -171,7 +192,7 @@ function animate(timestamp) {
 
     if (isCursorInsideTarget(appState.engine, appState.cursor.x, appState.cursor.y, slack())) {
       appState.dwellMs += dt;
-      if (appState.dwellMs >= 550) {
+      if (appState.dwellMs >= DWELL_MS) {
         shoot();
       }
     } else {
