@@ -34,14 +34,32 @@ const elements = {
 
 const context = elements.canvas.getContext("2d");
 
+// Logic and drawing use the 960x540 arena; the backing store follows the
+// screen's pixel density so the crosshair stays crisp.
+const ARENA_W = 960;
+const ARENA_H = 540;
+
+function fitCanvas() {
+  const ratio = Math.min(window.devicePixelRatio || 1, 2.5);
+  const scale = ((elements.canvas.clientWidth || ARENA_W) * ratio) / ARENA_W;
+  const width = Math.round(ARENA_W * scale);
+  const height = Math.round(ARENA_H * scale);
+  if (elements.canvas.width !== width || elements.canvas.height !== height) {
+    elements.canvas.width = width;
+    elements.canvas.height = height;
+  }
+  context.setTransform(scale, 0, 0, scale, 0, 0);
+  drawArena();
+}
+
 const appState = {
-  engine: createTrainerState({ width: elements.canvas.width, height: elements.canvas.height }),
+  engine: createTrainerState({ width: ARENA_W, height: ARENA_H }),
   running: false,
   useGaze: false,
   lastFrameAt: 0,
   cursor: {
-    x: elements.canvas.width / 2,
-    y: elements.canvas.height / 2,
+    x: ARENA_W / 2,
+    y: ARENA_H / 2,
   },
   dwellMs: 0,
   gaze: null,
@@ -193,7 +211,7 @@ function stopSession(message = "Session stopped") {
 }
 
 function startSession() {
-  appState.engine = createTrainerState({ width: elements.canvas.width, height: elements.canvas.height });
+  appState.engine = createTrainerState({ width: ARENA_W, height: ARENA_H });
   appState.running = true;
   appState.lastFrameAt = 0;
   appState.dwellMs = 0;
@@ -220,12 +238,12 @@ function updateGazeCursor(timestamp) {
   }
 
   const rect = elements.canvas.getBoundingClientRect();
-  const x = ((appState.gaze.x - rect.left) / rect.width) * elements.canvas.width;
-  const y = ((appState.gaze.y - rect.top) / rect.height) * elements.canvas.height;
+  const x = ((appState.gaze.x - rect.left) / rect.width) * ARENA_W;
+  const y = ((appState.gaze.y - rect.top) / rect.height) * ARENA_H;
   const smooth = appState.gazeFilter.filter(x, y, timestamp);
 
-  appState.cursor.x = Math.max(0, Math.min(elements.canvas.width, smooth.x));
-  appState.cursor.y = Math.max(0, Math.min(elements.canvas.height, smooth.y));
+  appState.cursor.x = Math.max(0, Math.min(ARENA_W, smooth.x));
+  appState.cursor.y = Math.max(0, Math.min(ARENA_H, smooth.y));
 }
 
 function animate(timestamp) {
@@ -347,8 +365,8 @@ elements.calibrateBtn.addEventListener("click", enableGaze);
 
 function aimFromEvent(event) {
   const rect = elements.canvas.getBoundingClientRect();
-  appState.cursor.x = ((event.clientX - rect.left) / rect.width) * elements.canvas.width;
-  appState.cursor.y = ((event.clientY - rect.top) / rect.height) * elements.canvas.height;
+  appState.cursor.x = ((event.clientX - rect.left) / rect.width) * ARENA_W;
+  appState.cursor.y = ((event.clientY - rect.top) / rect.height) * ARENA_H;
 }
 
 // Pointer events cover mouse, pen and touch. The eyes steer in gaze mode, so
@@ -385,5 +403,6 @@ window.addEventListener("beforeunload", () => {
 
 syncStats();
 showBest();
+new ResizeObserver(fitCanvas).observe(elements.canvas);
 drawArena();
 requestAnimationFrame(animate);
