@@ -19,6 +19,7 @@ export function createTrainerState({ width = 960, height = 540 } = {}) {
     score: 0,
     sessionMs: 0,
     targetLifetimeMs: 2200,
+    reactions: [],
   };
 }
 
@@ -61,6 +62,7 @@ export function registerShot(state, { didHit, reactionMs = state.target.ageMs, r
   };
 
   if (didHit) {
+    next.reactions = [...(state.reactions ?? []), Math.round(reactionMs)];
     next.hits += 1;
     next.streak += 1;
     next.score += scoreFromReaction(reactionMs, next.streak);
@@ -102,4 +104,16 @@ export function accuracyPercent(state) {
     return 0;
   }
   return Math.round((state.hits / attempts) * 100);
+}
+
+// Median rather than mean: one target you lost track of should not drag the
+// number for the whole session.
+export function reactionStats(state) {
+  const times = [...(state.reactions ?? [])].sort((a, b) => a - b);
+  if (times.length === 0) {
+    return { count: 0, medianMs: null, bestMs: null };
+  }
+  const mid = times.length >> 1;
+  const medianMs = times.length % 2 ? times[mid] : Math.round((times[mid - 1] + times[mid]) / 2);
+  return { count: times.length, medianMs, bestMs: times[0] };
 }

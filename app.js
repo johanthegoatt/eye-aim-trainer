@@ -4,6 +4,7 @@ import {
   registerShot,
   isCursorInsideTarget,
   accuracyPercent,
+  reactionStats,
 } from "./src/targetEngine.js";
 import { createPointFilter } from "./src/oneEuro.js";
 
@@ -27,6 +28,8 @@ const elements = {
   accuracy: document.getElementById("accuracy"),
   level: document.getElementById("level"),
   status: document.getElementById("status"),
+  reaction: document.getElementById("reaction"),
+  best: document.getElementById("best"),
 };
 
 const context = elements.canvas.getContext("2d");
@@ -121,6 +124,53 @@ function syncStats() {
   elements.misses.textContent = String(appState.engine.misses);
   elements.accuracy.textContent = `${accuracyPercent(appState.engine)}%`;
   elements.level.textContent = String(appState.engine.level);
+  const { medianMs } = reactionStats(appState.engine);
+  elements.reaction.textContent = medianMs === null ? "-" : `${medianMs} ms`;
+}
+
+// Personal bests per input mode: gaze is far slower than a mouse, so mixing
+// them would make one of the two numbers meaningless.
+const BEST_KEY = "eye-aim-trainer:best:v1";
+
+function readBests() {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(BEST_KEY) || "{}");
+    return parsed && typeof parsed === "object" ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+function showBest() {
+  const best = readBests()[appState.useGaze ? "gaze" : "mouse"];
+  elements.best.textContent = best ? `${best.score} pts, ${best.medianMs ?? "-"} ms` : "-";
+}
+
+// Returns what got beaten, for the end-of-session line.
+function recordSession() {
+  const mode = appState.useGaze ? "gaze" : "mouse";
+  const { score } = appState.engine;
+  const { medianMs } = reactionStats(appState.engine);
+  const bests = readBests();
+  const old = bests[mode] ?? {};
+  const beat = [];
+  const next = { ...old };
+  if (score > (old.score ?? -1)) {
+    next.score = score;
+    beat.push("score");
+  }
+  if (medianMs !== null && medianMs < (old.medianMs ?? Infinity)) {
+    next.medianMs = medianMs;
+    beat.push("reaction time");
+  }
+  if (beat.length) {
+    bests[mode] = next;
+    try {
+      localStorage.setItem(BEST_KEY, JSON.stringify(bests));
+    } catch {}
+  }
+  showBest();
+  return beat;
 }
 
 function shoot() {
@@ -151,6 +201,7 @@ function startSession() {
   elements.stopBtn.disabled = false;
   setOverlay("");
   setStatus(appState.useGaze ? "Mode: gaze tracking" : "Mode: mouse fallback");
+  showBest();
 }
 
 // WebGazer 2.x's getCurrentPrediction() returns a Promise, so reading .x off
@@ -200,7 +251,10 @@ function animate(timestamp) {
     }
 
     if (appState.engine.sessionMs >= SESSION_LENGTH_MS) {
-      stopSession(`Session done: ${appState.engine.score} points`);
+      const { medianMs } = reactionStats(appState.engine);
+      const beat = recordSession();
+      const reaction = medianMs === null ? "" : `, median reaction ${medianMs} ms`;
+      stopSession(`Session done: ${appState.engine.score} points${reaction}.${beat.length ? ` New best ${beat.join(" and ")}!` : ""}`);
     }
   }
 
@@ -330,5 +384,6 @@ window.addEventListener("beforeunload", () => {
 });
 
 syncStats();
+showBest();
 drawArena();
 requestAnimationFrame(animate);

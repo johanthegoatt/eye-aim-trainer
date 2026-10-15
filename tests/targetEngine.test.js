@@ -8,6 +8,7 @@ import {
   scoreFromReaction,
   stepTrainer,
   accuracyPercent,
+  reactionStats,
 } from "../src/targetEngine.js";
 
 test("spawnTarget keeps target inside arena margin", () => {
@@ -69,4 +70,17 @@ test("gaze slack widens the hit circle", () => {
 
   assert.equal(isCursorInsideTarget(state, 355, 200), false);
   assert.equal(isCursorInsideTarget(state, 355, 200, 34), true);
+});
+
+test("reaction stats keep hits only and report median and best", () => {
+  let state = createTrainerState();
+  for (const ms of [400, 900, 300, 600]) {
+    state = registerShot(state, { didHit: true, reactionMs: ms, randomFn: () => 0.5 });
+  }
+  state = registerShot(state, { didHit: false, reactionMs: 50, randomFn: () => 0.5 });
+  assert.deepEqual(reactionStats(state), { count: 4, medianMs: 500, bestMs: 300 });
+});
+
+test("reaction stats are empty before the first hit", () => {
+  assert.deepEqual(reactionStats(createTrainerState()), { count: 0, medianMs: null, bestMs: null });
 });
